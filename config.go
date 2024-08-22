@@ -1,39 +1,21 @@
-package main
+package wtsc
 
 import (
 	"encoding/json"
-	"github.com/alitto/pond"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"io"
 	"os"
 )
 
-type Config struct {
-	// Domain is Servicer domain
-	Domain string `json:"domain"`
-	// ChainPool list of the chains that are supported by the node runner.
-	ChainPool []string `json:"chain_pool"`
-	// ServicerKeys list of the private keys to use for sign nodes
-	ServicerKeys []string `json:"servicer_keys"`
-	// LogLevel is the level of logging
-	LogLevel string `json:"log_level"`
-	// Schedule is the cron schedule. Allow @every 1m or cron text.
-	// Refer to: https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format
-	Schedule string `json:"schedule"`
-	// Worker Pool config
-	MaxWorkers uint64 `json:"max_workers"`
-}
-
-func NewWorker(maxWorkers, maxCapacity uint64) {
-	workerPool = pond.New(int(maxWorkers), int(maxCapacity))
-}
-
+// ValidateConfig validates the provided configuration struct.
+// TODO: add as many validation as it needs here
 func ValidateConfig(cfg *Config) error {
 	// TODO: add as many validation as it needs here
 	return nil
 }
 
+// LoadConfig loads and returns the configuration by reading the `configPath` file.
 func LoadConfig() *Config {
 	cfg := Config{}
 	var configPath = "./config.json"
@@ -68,57 +50,79 @@ func LoadConfig() *Config {
 	return &cfg
 }
 
-func ReloadConfig(cfg *Config) {
+// ReloadConfig updates the provided configuration based on changes detected in a new configuration.
+func ReloadConfig() {
+	log.Debug().Msg("Reloading configuration")
 	newCfg := LoadConfig()
 
-	if cfg.Domain != newCfg.Domain {
+	if AppConfig.Domain != newCfg.Domain {
 		log.Debug().Msg("change detected at config.domain")
-		cfg.Domain = newCfg.Domain
+		AppConfig.Domain = newCfg.Domain
 	}
 
-	if diff := GetSliceDiff(cfg.ChainPool, newCfg.ChainPool); len(diff) > 0 {
+	if diff := GetStrSliceDiff(AppConfig.ChainPool, newCfg.ChainPool); len(diff) > 0 {
 		log.Debug().Msg("change detected at config.chain_pool")
-		cfg.ChainPool = newCfg.ChainPool
+		AppConfig.ChainPool = newCfg.ChainPool
 	}
 
-	if diff := GetSliceDiff(cfg.ServicerKeys, newCfg.ServicerKeys); len(diff) > 0 {
+	if diff := GetStrSliceDiff(AppConfig.ServicerKeys, newCfg.ServicerKeys); len(diff) > 0 {
 		log.Debug().Msg("change detected at config.servicer_keys")
-		cfg.ServicerKeys = newCfg.ServicerKeys
-		if len(cfg.ServicerKeys) < len(newCfg.ServicerKeys) {
-		}
+		AppConfig.ServicerKeys = newCfg.ServicerKeys
+		UpdateServicers(AppConfig.ServicerKeys)
 	}
 
-	if cfg.LogLevel != newCfg.LogLevel {
+	if AppConfig.StakeWeight != newCfg.StakeWeight {
+		log.Debug().Msg("change detected at config.stake_weight")
+		AppConfig.StakeWeight = newCfg.StakeWeight
+	}
+
+	if AppConfig.MinIncreasePercent != newCfg.MinIncreasePercent {
+		log.Debug().Msg("change detected at config.min_increase_percent")
+		AppConfig.MinIncreasePercent = newCfg.MinIncreasePercent
+	}
+
+	if AppConfig.StakeWeight != newCfg.StakeWeight {
+		log.Debug().Msg("change detected at config.stake_weight")
+		AppConfig.StakeWeight = newCfg.StakeWeight
+	}
+
+	if updated, removed, added := GetServiceStakeSliceDiff(AppConfig.MinServiceStake, newCfg.MinServiceStake); len(updated) > 0 || len(removed) > 0 || len(added) > 0 {
+		log.Debug().Msg("change detected at config.min_service_stake")
+		AppConfig.MinServiceStake = newCfg.MinServiceStake
+	}
+
+	if AppConfig.LogLevel != newCfg.LogLevel {
 		log.Debug().Msg("change detected at config.log_level")
 		// here it will already be validated by LoadConfig but just in case.
-		newLvl, err := zerolog.ParseLevel(cfg.LogLevel)
+		newLvl, err := zerolog.ParseLevel(AppConfig.LogLevel)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to parse log level")
 		} else {
-			cfg.LogLevel = newCfg.LogLevel
+			AppConfig.LogLevel = newCfg.LogLevel
 			zerolog.SetGlobalLevel(newLvl)
 		}
 	}
 
-	if cfg.Schedule != newCfg.Schedule {
+	if AppConfig.Schedule != newCfg.Schedule {
 		log.Debug().Msg("change detected at config.schedule")
-		err := ReSchedule(cfg.Schedule)
+		err := ReSchedule(AppConfig.Schedule)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to parse log level")
 		} else {
-			// assign to cfg reference the new value.
-			cfg.Schedule = newCfg.Schedule
+			// assign to AppConfig reference the new value.
+			AppConfig.Schedule = newCfg.Schedule
 		}
 	}
 
-	if cfg.MaxWorkers != newCfg.MaxWorkers {
-		waitingTasks := workerPool.WaitingTasks()
+	if AppConfig.MaxWorkers != newCfg.MaxWorkers {
+		waitingTasks := WorkerPool.WaitingTasks()
 		if waitingTasks > 0 {
 			log.Error().Uint64("waiting_tasks", waitingTasks).Msg("unable to update worker pool min/max workers due to it has waiting tasks. will be retried on next round.")
 		} else {
-			workerPool.StopAndWait()
+			WorkerPool.StopAndWait()
 			// max capacity will always be the same of servicer keys
 			NewWorker(newCfg.MaxWorkers, uint64(len(newCfg.ServicerKeys)))
 		}
 	}
+
 }

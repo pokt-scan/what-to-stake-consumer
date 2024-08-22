@@ -1,0 +1,27 @@
+{
+  "what_to_stake_service": "WTS-ENDPOINT",
+  "network_id": "testnet",
+  "tx_memo": "wtsc",
+  "tx_fee": 10000,
+  "domain": "PROVIDER-DOMAIN",
+  "chain_pool": [
+   "CHAIN_ID"
+  ],
+  "servicer_keys": [
+    "PRIV_KEY"
+  ],
+  "stake_weight": 4,
+  "min_increase_percent": 5,
+  "min_service_stake": [
+    {
+      "service": "0021",
+      "min_node": 24
+    }
+  ],
+  "pocket_rpc": "POCKET_RPC_ENDPOINT",
+  "log_level": "debug",
+  "schedule": "@every 30s",
+  "max_workers": 1,
+  "max_retries": 1,
+  "max_timeout": 60000
+}
