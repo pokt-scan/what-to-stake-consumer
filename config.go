@@ -79,7 +79,7 @@ func ValidateConfig(cfg *Config) (valid bool, errors []string) {
 		errors = append(errors, "service_pool")
 	}
 
-	if !IsValidServicerList(cfg.ServicerKeys) {
+	if !IsValidServicerList(cfg.ServicerKeys, cfg.DryMode) {
 		errors = append(errors, "servicer_keys")
 	}
 

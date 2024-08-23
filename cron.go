@@ -27,7 +27,7 @@ func writeResults(result *generated.GetWhatToStakeResponse) {
 	dateTimeString := currentTime.Format("20060102_150405")
 
 	// Define the file name with the formatted date and time
-	fileName := fmt.Sprintf("file_%s.json", dateTimeString)
+	fileName := fmt.Sprintf("wts_result_%s.json", dateTimeString)
 
 	// Concatenate paths to form the full file path
 	fullPath := filepath.Join(AppConfig.ResultsPath, fileName)

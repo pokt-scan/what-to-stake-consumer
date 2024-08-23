@@ -2,6 +2,16 @@
 
 This tool provides optimal* deployments of a series of nodes in the POKT Network.
 
+### Table of Contents
+
+- [Optimization Process](#optimization-process)
+- [Important Warning](#important-warning)
+- [Requirements](#requirements)
+- [How To Use](#how-to-use)
+- [Understanding `config.json` Values](#understanding-configjson-values)
+- [Available Environment Variables](#available-environment-variables)
+- [FAQ](#faq)
+
 ### Optimization Process
 
 Before using the provided recommendations, it's important to understand several key points regarding the optimization process:
@@ -18,6 +28,10 @@ Before using the provided recommendations, it's important to understand several 
 
 **The optimization results are optimal given the aforementioned simplifications.**
 
+### IMPORTANT WARNING
+
+⚠️ **Recommendation:** Before adding keys, we strongly advise you to first use the tool with `dry_mode` set to `true`. This will allow you to understand what the tool is going to do without making any actual changes. ⚠️
+
 ### Requirements
 
 1. POKTscan API Token. Get yours at: [POKTscan API Token](https://poktscan.com/teams?tab=api_token)
@@ -25,44 +39,73 @@ Before using the provided recommendations, it's important to understand several 
 ### How To Use
 
 1. Create a copy of `config.json.sample` and name it `config.json`.
-2. Edit `config.json` with your desired values.
+2. Edit `config.json` with your desired values. **Make sure to set `dry_mode` to `true` initially to understand the tool's behavior without making any changes.**
 3. Generate the GraphQL types by running: `go generate`.
 4. Start the service with Docker:
-```sh
-docker compose up --build
-```
-An existing Docker image build is available at [Docker Hub](https://hub.docker.com/repository/docker/poktscan/wtsc/general).
+    ```sh
+    docker compose up --build
+    ```
+   An existing Docker image build is available at [Docker Hub](https://hub.docker.com/repository/docker/poktscan/wtsc/general).
 
-If you want/need to modify the path and name of the config file, please use `CONFIG_FILE` to override the default `./config.json`
+If you want/need to modify the path and name of the config file, please use `CONFIG_FILE` to override the default `./config.json`.
 
 ### Understanding `config.json` Values
 
-| Parameter             | Type                | Description                                                                                                      |
-|-----------------------|---------------------|------------------------------------------------------------------------------------------------------------------|
-| dry_mode              | boolean             | If true, calls to "What to Stake" will write results to `results_path` or print them if `results_path` is empty. |
-| poktscan_api          | string              | POKTscan API endpoint                                                                                            |
-| poktscan_api_token    | string              | POKTscan API token                                                                                               |
-| network_id            | string              | Can be "mainnet" or "testnet"                                                                                    |
-| tx_memo               | string              | Transaction memo                                                                                                 |
-| tx_fee                | integer             | Transaction fee                                                                                                  |
-| domain                | string              | Your node's domain (e.g., "poktscan.cloud" or "c0d3r.org")                                                       |
-| chain_pool            | array of strings    | Chain IDs available in your fleet                                                                                |
-| servicer_keys         | array of strings    | List of private keys for signing stake transactions                                                              |
-| stake_weight          | integer             | Used by the "What to Stake" service to estimate potential rewards (1-4)                                          |
-| min_increase_percent  | integer             | Minimum percentage increase expected to process stakes                                                           |
-| min_service_stake     | array of objects    | Minimum number of nodes for specific services `{"service":"<service_id>", "min_node": <int>}`. Empty is allowed  |
-| time_period           | integer             | Time in hours to consider for relay averages                                                                     |
-| results_path          | string              | Path to save "What to Stake" results (empty to disable)                                                          |
-| pocket_rpc            | string              | Pocket node or load balancer URL                                                                                 |
-| log_level             | string              | Log level                                                                                                        |
-| log_format            | string              | Log format (json or colorized text)                                                                              |
-| schedule              | string              | Frequency of the "What to Stake" service calls                                                                   |
-| max_workers           | integer             | Number of workers to process stake transactions in parallel                                                      |
-| max_retries           | integer             | Number of retries for HTTP calls (POKTscan API or Pocket RPC)                                                    |
-| max_timeout           | integer             | Timeout in milliseconds for HTTP calls                                                                           |
+| Parameter            | Type                | Description                                                                                                      |
+|----------------------|---------------------|------------------------------------------------------------------------------------------------------------------|
+| dry_mode             | boolean             | If true, calls to "What to Stake" will write results to `results_path` or print them if `results_path` is empty. |
+| poktscan_api         | string              | POKTscan API endpoint                                                                                            |
+| poktscan_api_token   | string              | POKTscan API token                                                                                               |
+| network_id           | string              | Can be "mainnet" or "testnet"                                                                                    |
+| tx_memo              | string              | Transaction memo                                                                                                 |
+| tx_fee               | integer             | Transaction fee                                                                                                  |
+| domain               | string              | Your node's domain (e.g., "poktscan.cloud" or "c0d3r.org")                                                       |
+| service_pool         | array of strings    | Service IDs (aka chain on morse) available in your fleet                                                         |
+| servicer_keys        | array of strings    | List of private keys for signing stake transactions                                                              |
+| stake_weight         | integer             | Used by the "What to Stake" service to estimate potential rewards (1-4)                                          |
+| min_increase_percent | integer             | Minimum percentage increase expected to process stakes                                                           |
+| min_service_stake    | array of objects    | Minimum number of nodes for specific services `{"service":"<service_id>", "min_node": <int>}`. Empty is allowed  |
+| time_period          | integer             | Time in hours to consider for relay averages                                                                     |
+| results_path         | string              | Path to save "What to Stake" results (empty to disable)                                                          |
+| pocket_rpc           | string              | Pocket node or load balancer URL                                                                                 |
+| log_level            | string              | Log level                                                                                                        |
+| log_format           | string              | Log format (json or colorized text)                                                                              |
+| schedule             | string              | Frequency of the "What to Stake" service calls                                                                   |
+| max_workers          | integer             | Number of workers to process stake transactions in parallel                                                      |
+| max_retries          | integer             | Number of retries for HTTP calls (POKTscan API or Pocket RPC)                                                    |
+| max_timeout          | integer             | Timeout in milliseconds for HTTP calls                                                                           |
+
+### Available Environment Variables
+
+1. `RELOAD_SECONDS`: Time in seconds to reload the config file.
+2. `CONFIG_FILE`: Override the default `./config.json` path to lookup configs.
 
 ### FAQ
 
 #### Do I need to restart the WTSC if I change `config.json`?
 
 No, the service supports hot reload, configurable via the `RELOAD_SECONDS` environment variable.
+
+#### What happens in `dry_mode`?
+
+When `dry_mode` is set to `true`, the tool simulates its operations and outputs the potential changes without making any actual stakes. This allows you to preview the recommended adjustments and understand their impact without modifying your node configurations.
+
+#### How often should I adjust my stakes?
+
+This depends on the network dynamics and the changes in relay patterns. Given that the network and other participants' behaviors are constantly evolving, it is advisable to review the recommendations periodically and adjust your stakes accordingly.
+
+#### Can I customize the logging format?
+
+Yes, you can customize the log format by setting the `log_format` parameter in `config.json`. Available options are `json` for JSON formatted logs and `text` for colorized text logs.
+
+#### What does the `schedule` parameter do?
+
+The `schedule` parameter specifies how often the "What to Stake" service should run. This is useful for automating the regular review and adjustment of your node stakes based on up-to-date network data.
+
+#### How do I override the default configuration file path?
+
+You can override the default configuration file path by setting the `CONFIG_FILE` environment variable to the desired file path. This allows you to use a custom configuration file location if necessary.
+
+#### What should I do if the tool is not producing expected results?
+
+Ensure that your configuration is correct and up-to-date. Also, consider checking the logs for any errors or warnings that might indicate issues. If the problem persists, you can reach out to the support or community forums for assistance.

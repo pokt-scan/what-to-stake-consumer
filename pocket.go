@@ -67,8 +67,9 @@ func IsValidChainPool(chains []string) bool {
 	return true
 }
 
-func IsValidServicerList(servicerList []string) bool {
-	if len(servicerList) == 0 {
+func IsValidServicerList(servicerList []string, isDryMode bool) bool {
+	if len(servicerList) == 0 && !isDryMode {
+		// in dry mode an empty list is ok.
 		return false
 	}
 
