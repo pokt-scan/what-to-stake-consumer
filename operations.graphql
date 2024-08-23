@@ -1,0 +1,13 @@
+query GetWhatToStake($input: WtsProcessRequestInput!) {
+    GetWhatToStake(input: $input) {
+        do_update
+        reason
+        gain_change_percent
+        current_modeled_gain_24h
+        optimal_modeled_gain_24h
+        servicers {
+            address
+            services
+        }
+    }
+}

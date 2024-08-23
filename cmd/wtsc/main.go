@@ -47,21 +47,32 @@ func Run() {
 }
 
 func main() {
-
 	cfg := wtsc.LoadConfig()
+
+	if valid, wrongKeys := wtsc.ValidateConfig(cfg); !valid {
+		log.Fatal().
+			Str("path", wtsc.GetConfigFilePath()).
+			Int("count", len(wrongKeys)).
+			Strs("keys", wrongKeys).
+			Msg("loaded config.json contains errors")
+	}
+
 	wtsc.AppConfig = cfg
 
 	// Configure logger
-	wtsc.ConfigLogger(wtsc.AppConfig.LogLevel)
+	wtsc.ConfigLogger(wtsc.AppConfig.LogLevel, wtsc.AppConfig.LogFormat)
 
 	// Configure http client
-	wtsc.NewHttpClient(cfg.MaxRetries)
+	wtsc.NewHttpClient(wtsc.AppConfig.POKTscanApiToken, wtsc.AppConfig.MaxRetries, wtsc.AppConfig.MaxTimeout)
+
+	// Create POKTscan Client
+	wtsc.NewPOKTscanClient(wtsc.AppConfig.POKTscanApi)
 
 	// Create PocketRpcProvider
-	wtsc.NewPocketRpcProvider()
+	wtsc.NewPocketRpcProvider(wtsc.AppConfig.PocketRPC, wtsc.AppConfig.MaxRetries, wtsc.AppConfig.MaxTimeout)
 
 	// Initialize the worker pool
-	wtsc.NewWorker(cfg.MaxWorkers, uint64(len(cfg.ServicerKeys)))
+	wtsc.NewWorker(cfg.MaxWorkers, uint(len(cfg.ServicerKeys)))
 
 	// Initialize the servicers map
 	wtsc.NewSignerMap(cfg.ServicerKeys)

@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/go-cleanhttp"
 	pocketGoProvider "github.com/pokt-foundation/pocket-go/provider"
 	pocketGoSigner "github.com/pokt-foundation/pocket-go/signer"
+	pocketGoUtils "github.com/pokt-foundation/pocket-go/utils"
 	pocketCoreCodec "github.com/pokt-network/pocket-core/codec"
 	pocketCoreCodecTypes "github.com/pokt-network/pocket-core/codec/types"
 	pocketCoreCrypto "github.com/pokt-network/pocket-core/crypto"
@@ -19,6 +20,7 @@ import (
 	pocketCoreNodes "github.com/pokt-network/pocket-core/x/nodes"
 	pocketCoreNodesTypes "github.com/pokt-network/pocket-core/x/nodes/types"
 	pocketCore "github.com/pokt-network/pocket-core/x/pocketcore"
+	"github.com/pokt-scan/wtsc/generated"
 	"github.com/rs/zerolog/log"
 	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"math"
@@ -53,7 +55,51 @@ func MakeCodec() {
 	pocketCoreCodec.RegisterEvidences(PocketCoreCodec.AminoCodec(), PocketCoreCodec.ProtoCodec())
 }
 
-func StakeServicer(signer *pocketGoSigner.Signer, servicer *WTSService) func() {
+func IsValidChainPool(chains []string) bool {
+	if len(chains) == 0 {
+		return false
+	}
+
+	for _, chain := range chains {
+		if e := pocketCoreNodesTypes.ValidateNetworkIdentifier(chain); e != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func IsValidServicerList(servicerList []string) bool {
+	if len(servicerList) == 0 {
+		return false
+	}
+
+	for _, servicer := range servicerList {
+		if !pocketGoUtils.ValidatePrivateKey(servicer) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func IsValidMinServiceStake(minServiceStakeList MinServiceStake) bool {
+	if len(minServiceStakeList) == 0 {
+		return false
+	}
+
+	for _, minServiceStake := range minServiceStakeList {
+		if err := pocketCoreNodesTypes.ValidateNetworkIdentifier(minServiceStake.Service); err != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+func StakeServicer(
+	signer *pocketGoSigner.Signer,
+	servicer *generated.GetWhatToStakeGetWhatToStakeWtsOptimizationResponseServicersWtsStakeNode,
+) func() {
 	return func() {
 		// stake
 		log.Debug().Str("address", signer.GetAddress()).Msg("reading node from rpc")
@@ -124,7 +170,7 @@ func StakeServicer(signer *pocketGoSigner.Signer, servicer *WTSService) func() {
 
 		txMsg := &pocketCoreNodesTypes.MsgStake{
 			PublicKey:  cryptoPublicKey,
-			Chains:     servicer.Chains,
+			Chains:     servicer.Services, // aka chains on morse
 			Value:      pocketCoreTypes.NewInt(nodeTokens),
 			ServiceUrl: node.ServiceURL,
 			Output:     decodedAddress,
@@ -163,7 +209,7 @@ func StakeServicer(signer *pocketGoSigner.Signer, servicer *WTSService) func() {
 
 		log.Info().
 			Str("address", signer.GetAddress()).
-			Strs("chains", servicer.Chains).
+			Strs("chains", servicer.Services).
 			Str("height", txResult.Height).
 			Str("hash", txResult.Txhash).
 			Str("raw_log", txResult.RawLog).
@@ -171,12 +217,12 @@ func StakeServicer(signer *pocketGoSigner.Signer, servicer *WTSService) func() {
 	}
 }
 
-func NewPocketRpcProvider() {
+func NewPocketRpcProvider(url string, maxRetries, maxTimeout uint) {
 	// create a pocket rpc provider to reuse it
-	PocketRpcProvider = pocketGoProvider.NewProvider(AppConfig.PocketRPC)
+	PocketRpcProvider = pocketGoProvider.NewProvider(url)
 	PocketRpcProvider.UpdateRequestConfig(pocketGoProvider.RequestConfigOpts{
-		Retries:   int(AppConfig.MaxRetries),
-		Timeout:   time.Duration(AppConfig.MaxTimeout) * time.Millisecond,
+		Retries:   int(maxRetries),
+		Timeout:   time.Duration(maxTimeout) * time.Millisecond,
 		Transport: cleanhttp.DefaultPooledTransport(),
 	})
 }
