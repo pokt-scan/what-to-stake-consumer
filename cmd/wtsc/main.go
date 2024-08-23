@@ -13,7 +13,7 @@ import (
 func Run() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Trace().Stack().Timestamp().
+			wtsc.Logger.Trace().Stack().Timestamp().
 				Interface("recover", r).
 				Msg("Recovered from panic")
 		}
@@ -38,7 +38,7 @@ func Run() {
 		sleepDuration = time.Duration(reloadSeconds) * time.Second
 	}
 
-	log.Info().Dur("duration", sleepDuration).Msg("config reload")
+	wtsc.Logger.Info().Dur("duration", sleepDuration).Msg("config hot reload configured")
 
 	for {
 		time.Sleep(sleepDuration)
@@ -47,21 +47,24 @@ func Run() {
 }
 
 func main() {
-
 	cfg := wtsc.LoadConfig()
+
 	wtsc.AppConfig = cfg
 
 	// Configure logger
-	wtsc.ConfigLogger(wtsc.AppConfig.LogLevel)
+	wtsc.ConfigLogger(wtsc.AppConfig.LogLevel, wtsc.AppConfig.LogFormat)
 
 	// Configure http client
-	wtsc.NewHttpClient(cfg.MaxRetries)
+	wtsc.NewHttpClient(wtsc.AppConfig.POKTscanApiToken, wtsc.AppConfig.MaxRetries, wtsc.AppConfig.MaxTimeout)
+
+	// Create POKTscan Client
+	wtsc.NewPOKTscanClient(wtsc.AppConfig.POKTscanApi)
 
 	// Create PocketRpcProvider
-	wtsc.NewPocketRpcProvider()
+	wtsc.NewPocketRpcProvider(wtsc.AppConfig.PocketRPC, wtsc.AppConfig.MaxRetries, wtsc.AppConfig.MaxTimeout)
 
 	// Initialize the worker pool
-	wtsc.NewWorker(cfg.MaxWorkers, uint64(len(cfg.ServicerKeys)))
+	wtsc.NewWorker(cfg.MaxWorkers, uint(len(cfg.ServicerKeys)))
 
 	// Initialize the servicers map
 	wtsc.NewSignerMap(cfg.ServicerKeys)
@@ -78,18 +81,20 @@ func main() {
 	// Notify the channel on interrupt and termination signals
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Info().Msg("Starting What-To-Stake Consumer...")
+	wtsc.Logger.Info().Msg("starting what to stake consumer...")
 	go Run()
 
 	// Block until we receive a signal
 	sig := <-sigChan
-	log.Info().Str("signal", sig.String()).Msg("Received signal. Exiting...")
-	log.Info().Msg("Shutting down...")
+	wtsc.Logger.Info().Str("signal", sig.String()).Msg("received signal. exiting...")
+	wtsc.Logger.Info().Msg("shutting down...")
 	// stop cron job schedule another one
 	wtsc.CronJob.Stop()
 	// wait for any in progress job.
-	log.Debug().Uint64("waiting_tasks", wtsc.WorkerPool.WaitingTasks()).Msg("Shutting down Workers...")
+	if wtsc.WorkerPool.WaitingTasks() > 0 {
+		wtsc.Logger.Debug().Uint64("waiting_tasks", wtsc.WorkerPool.WaitingTasks()).Msg("shutting down workers...")
+	}
 	wtsc.WorkerPool.StopAndWait()
-	log.Info().Msg("See you later, baby!")
+	wtsc.Logger.Info().Msg("see you later, baby!")
 	os.Exit(0)
 }

@@ -1,53 +1,112 @@
 package wtsc
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/pokt-scan/wtsc/generated"
 	"github.com/robfig/cron/v3"
-	"github.com/rs/zerolog/log"
+	"os"
+	"path/filepath"
+	"time"
 )
 
-func evaluationJob() {
-	log.Info().Msg("Running evaluation job")
-
-	// @TODO: Uncomment once WTS exists
-	//resp, err := HttpRetryableClient.Post(AppConfig.WhatToStakeService, "application/json", WTSParams{
-	//	Domain:             AppConfig.Domain,
-	//	ServicePool:        AppConfig.ChainPool,
-	//	MinIncreasePercent: AppConfig.MinIncreasePercent,
-	//	StakeWeight:        AppConfig.StakeWeight,
-	//	MinServiceStake:    AppConfig.MinServiceStake,
-	//})
-	//if err != nil {
-	//	log.Error().Err(err).Str("service", AppConfig.WhatToStakeService).Msg("Failed to call what to stake service")
-	//}
-	//if resp.StatusCode != http.StatusOK {
-	//	log.Error().Err(errors.New(resp.Status)).Int("code", resp.StatusCode).Str("service", AppConfig.WhatToStakeService).Msg("Failed to call what to stake service")
-	//}
-	// @TODO: Update WTSResponse struct with the right fields and update code below
-	whatToStakeResponse := WTSResponse{
-		DoUpdate: true,
-		Servicers: []*WTSService{
-			{
-				Address: "e5e87a03577606b9d8be9456c0424f228b06893d",
-				Chains:  []string{"0021"},
-			},
-		},
+func writeResults(result *generated.GetWhatToStakeResponse) {
+	// Convert the struct to pretty-printed JSON
+	prettyJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		Logger.Error().Err(err).Msg("error marshalling to JSON what to stake result")
+		return
 	}
 
-	if !whatToStakeResponse.DoUpdate {
-		log.Info().Msg("What-To-Stake thinks you does not need to update yet.")
+	// Get the current date and time
+	currentTime := time.Now()
+
+	// Format the date and time to a string
+	dateTimeString := currentTime.Format("20060102_150405")
+
+	// Define the file name with the formatted date and time
+	fileName := fmt.Sprintf("wts_result_%s.json", dateTimeString)
+
+	// Concatenate paths to form the full file path
+	fullPath := filepath.Join(AppConfig.ResultsPath, fileName)
+
+	// Write the JSON to a file
+	file, err := os.Create(fullPath)
+	if err != nil {
+		Logger.Error().Err(err).Str("path", fullPath).Msg("error creating file")
+		return
+	}
+	defer func(file *os.File) {
+		e := file.Close()
+		if e != nil {
+			Logger.Error().Err(e).Str("path", fullPath).Msg("error closing file results file")
+		}
+	}(file)
+
+	_, err = file.Write(prettyJSON)
+	if err != nil {
+		Logger.Error().Err(err).Str("path", fullPath).Msg("error writing to file")
+		return
+	}
+
+	Logger.Info().Str("path", fullPath).Msg("writing results to file")
+}
+
+func evaluationJob() {
+	Logger.Info().Msg("running evaluation")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(AppConfig.MaxTimeout)*time.Millisecond)
+	defer cancel()
+
+	input := generated.WtsProcessRequestInput{
+		Domain:               AppConfig.Domain,
+		Service_pool:         AppConfig.ServicePool,
+		Min_increase_percent: AppConfig.MinIncreasePercent,
+		Stake_weight:         int(AppConfig.StakeWeight),
+		Min_service_stake:    AppConfig.MinServiceStake.CastToGqlType(),
+		Time_period:          int(AppConfig.TimePeriod),
+	}
+
+	Logger.Info().Msg("calling what to stake service")
+	resp, err := generated.GetWhatToStake(ctx, *POKTscanApiClient, input)
+
+	if err != nil {
+		Logger.Error().Err(err).Str("service", AppConfig.POKTscanApi).Msg("failed to call what to stake service")
+		return
+	}
+
+	if IsEmptyString(AppConfig.ResultsPath) {
+		resultStr, e := json.Marshal(resp)
+		if e != nil {
+			Logger.Error().Err(e).Msg("failed to marshal results")
+		} else {
+			Logger.Debug().Str("result", string(resultStr)).Msg("what to stake results")
+		}
+	} else {
+		writeResults(resp)
+	}
+
+	if AppConfig.DryMode {
+		Logger.Info().Msg("DRY MODE is on, omitting stake transactions.")
+		return
+	}
+
+	if !resp.GetWhatToStake.Do_update {
+		Logger.Info().Msg("What-To-Stake thinks you does not need to update yet.")
 		return
 	}
 
 	// create a group inside worker pool because it allows just waiting without a stop
 	group := WorkerPool.Group()
 
-	for _, wtsServicer := range whatToStakeResponse.Servicers {
+	for _, wtsServicer := range resp.GetWhatToStake.Servicers {
 		if signer, ok := ServicersMap.Load(wtsServicer.Address); !ok {
-			log.Warn().Str("address", wtsServicer.Address).Msg("Failed to find signer")
+			Logger.Warn().Str("address", wtsServicer.Address).Msg("Failed to find signer")
 			continue
 		} else {
-			group.Submit(StakeServicer(signer, wtsServicer))
+			group.Submit(StakeServicer(signer, &wtsServicer))
 		}
 	}
 
@@ -56,10 +115,11 @@ func evaluationJob() {
 }
 
 func Schedule(frequency string) (entry cron.EntryID, err error) {
+	Logger.Info().Msg("preparing cron job")
 	CronJob = cron.New()
 	// Define the job
 	entry, err = CronJob.AddFunc(frequency, evaluationJob)
-	log.Debug().Int("ScheduleID", int(entry)).Msg("scheduled job")
+	Logger.Debug().Int("schedule_id", int(entry)).Msg("scheduled job detail")
 	// Start the cron job
 	CronJob.Start()
 	return
@@ -79,7 +139,7 @@ func ReSchedule(frequency string) error {
 		return err
 	}
 
-	log.Debug().Int("NewScheduleID", int(entryId)).Msg("re-scheduled job")
+	Logger.Debug().Int("NewScheduleID", int(entryId)).Msg("re-scheduled job")
 
 	return nil
 }

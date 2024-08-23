@@ -1,6 +1,12 @@
 package wtsc
 
-import "encoding/json"
+//go:generate go run github.com/pokt-scan/wtsc/cmd/schema
+
+import (
+	"encoding/json"
+	"github.com/pokt-scan/wtsc/generated"
+	"net/http"
+)
 
 // Application Types
 
@@ -11,9 +17,26 @@ type ServiceStake struct {
 	MinNode uint `json:"min_node"`
 }
 
+type MinServiceStake []ServiceStake
+
+func (ss MinServiceStake) CastToGqlType() (r []generated.WtsMinServiceStakeInput) {
+	for _, v := range ss {
+		r = append(r, generated.WtsMinServiceStakeInput{
+			Service:   v.Service,
+			Min_nodes: int(v.MinNode),
+		})
+	}
+	return
+}
+
 type Config struct {
-	// WhatToStakeService service url
-	WhatToStakeService string `json:"what_to_stake_service"`
+	// DryMode allows you to run the service without impact your stake, this will just print logs and save results
+	// if ResultsPath has a value.
+	DryMode bool `json:"dry_mode"`
+	// POKTscanApi api url
+	POKTscanApi string `json:"poktscan_api"`
+	// POKTscanApiToken access token
+	POKTscanApiToken string `json:"poktscan_api_token"`
 	// Pocket Network ID for tx (mainnet or testnet)
 	// Refers to: https://github.com/pokt-foundation/pocket-go/blob/master/transaction-builder/transaction_builder.go#L36
 	NetworkID string `json:"network_id"`
@@ -23,48 +46,45 @@ type Config struct {
 	TxFee json.Number `json:"tx_fee"`
 	// Domain is Servicer domain to query what-to-stake
 	Domain string `json:"domain"`
-	// ChainPool list of the chains that are supported by the node runner.
-	ChainPool []string `json:"chain_pool"`
+	// ServicePool list of the service (aka chain) that are supported by the node runner.
+	ServicePool []string `json:"service_pool"`
 	// ServicerKeys list of the private keys to use for sign nodes
 	ServicerKeys []string `json:"servicer_keys"`
 	// StakeWeight the stake weight that will be sent to what-to-stake service
 	StakeWeight uint `json:"stake_weight"`
 	// MinIncreasePercent the amount of change percent sent to what-to-stake service
-	MinIncreasePercent float32 `json:"min_increase_percent"`
+	MinIncreasePercent float64 `json:"min_increase_percent"`
 	// MinServiceStake (optional) just in case the need to pass a minimum amount of services on a specific chain
-	MinServiceStake []ServiceStake `json:"min_service_stake"`
+	MinServiceStake MinServiceStake `json:"min_service_stake"`
+	// TimePeriod in hours used to get the amount of relays
+	TimePeriod uint `json:"time_period"`
+	// ResultPath allows you to save wts results, mostly for debug or if you think something is going wrong.
+	// This will also allow you to share with POKTscan in case you think something is wrong.
+	// Empty value disable this.
+	ResultsPath string `json:"results_path"`
 	// LogLevel is the level of logging
 	LogLevel string `json:"log_level"`
+	// LogFormat allows to use JSON(optimal) or ColorizedText(slower). Values allowed: json|text
+	LogFormat string `json:"log_format"`
 	// Schedule is the cron schedule. Allow @every 1m or cron text.
 	// Refer to: https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format
 	Schedule string `json:"schedule"`
 	// Worker Pool config
-	MaxWorkers uint64 `json:"max_workers"`
+	MaxWorkers uint `json:"max_workers"`
 	// PocketRPC url to call /v1/query/nodes & /v1/client/rawTx
 	PocketRPC string `json:"pocket_rpc"`
 	// MaxRetries for PocketRpc and WhatToStake call
-	MaxRetries uint64 `json:"max_retries"`
+	MaxRetries uint `json:"max_retries"`
 	// MaxTimeout for PocketRpc and WhatToStake call (milliseconds)
-	MaxTimeout uint64 `json:"max_timeout"`
+	MaxTimeout uint `json:"max_timeout"`
 }
 
-// What To Stake Types
-
-type WTSParams struct {
-	Domain             string         `json:"domain"`
-	ServicePool        []string       `json:"service_pool"`
-	MinIncreasePercent float32        `json:"min_increase_percent"`
-	StakeWeight        uint           `json:"stake_weight"`
-	MinServiceStake    []ServiceStake `json:"min_service_stake"`
+type AuthedTransport struct {
+	token   string
+	wrapped http.RoundTripper
 }
 
-type WTSService struct {
-	Address string   `json:"address"`
-	Chains  []string `json:"chains"`
-}
-
-type WTSResponse struct {
-	DoUpdate  bool          `json:"do_update"`
-	Reason    string        `json:"reason"`
-	Servicers []*WTSService `json:"servicers"`
+func (t *AuthedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("Authorization", t.token)
+	return t.wrapped.RoundTrip(req)
 }

@@ -1,6 +1,13 @@
 package wtsc
 
-import "reflect"
+import (
+	"fmt"
+	"net/url"
+	"os"
+	"reflect"
+	"regexp"
+	"strings"
+)
 
 func GetStrSliceDiff(slice1, slice2 []string) (diff []string) {
 	m := make(map[string]bool)
@@ -60,4 +67,86 @@ func FindStringInSlice(slice []string, str string) bool {
 		}
 	}
 	return false
+}
+
+// IsEmptyString checks if a string is empty by comparing it to an empty string.
+func IsEmptyString(str string) bool {
+	return str == ""
+}
+
+func IsValidHttpURI(uri string) bool {
+	if IsEmptyString(uri) {
+		return false
+	}
+
+	parsedURL, err := url.ParseRequestURI(uri)
+	if err != nil {
+		return false
+	}
+
+	// Check if the scheme is HTTP or HTTPS
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return false
+	}
+
+	// Check if the host is not empty
+	if parsedURL.Host == "" {
+		return false
+	}
+
+	return true
+}
+
+func IsValidDomain(domain string) bool {
+	// Check the length of the entire domain
+	if len(domain) > 253 {
+		return false
+	}
+
+	// Define the regex for validating each label
+	var labelRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
+
+	// Split the domain into labels and validate each one
+	labels := strings.Split(domain, ".")
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 || !labelRegex.MatchString(label) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func IsWritableDirectory(path string) bool {
+	// Check if the path exists
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	if err != nil {
+		fmt.Println("Error:", err)
+		return false
+	}
+
+	// Check if the path is a directory
+	if !info.IsDir() {
+		return false
+	}
+
+	// Check write permission by attempting to create a temporary file
+	testFile := fmt.Sprintf("%s/.write_test", path)
+	file, err := os.Create(testFile)
+	if err != nil {
+		return false
+	}
+	err = file.Close()
+	if err != nil {
+		return false
+	}
+	err = os.Remove(testFile)
+	if err != nil {
+		return false
+	}
+
+	return true
 }

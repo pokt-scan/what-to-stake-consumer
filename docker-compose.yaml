@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  wtsc:
+    build:
+      context: .
+    volumes:
+      - ./config.json:/app/config.json
+      - ./results:/app/results
+    image: poktscan/wtsc:local
+    container_name: wtsc

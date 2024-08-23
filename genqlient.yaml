@@ -1,0 +1,5 @@
+schema: generated/schema.graphql
+operations:
+  - operations.graphql
+generated: generated/wts.go
+package: generated

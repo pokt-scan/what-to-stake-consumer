@@ -1,9 +1,17 @@
 package wtsc
 
 import (
+	"fmt"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/diode"
+	"github.com/rs/zerolog/pkgerrors"
 	"os"
+	"time"
+)
+
+const (
+	LogJsonFormat = "json"
+	LogTextFormat = "text"
 )
 
 // ZerologLeveledLogger is an implementation of retryablehttp.LeveledLogger using zerolog
@@ -12,9 +20,9 @@ type ZerologLeveledLogger struct {
 }
 
 // NewZerologLeveledLogger creates a new ZerologLeveledLogger
-func NewZerologLeveledLogger() *ZerologLeveledLogger {
+func NewZerologLeveledLogger(l zerolog.Logger) *ZerologLeveledLogger {
 	return &ZerologLeveledLogger{
-		logger: log.Output(zerolog.ConsoleWriter{Out: os.Stderr}),
+		logger: l,
 	}
 }
 
@@ -38,13 +46,37 @@ func (l *ZerologLeveledLogger) Warn(msg string, keysAndValues ...interface{}) {
 	l.logger.Warn().Fields(keysAndValues).Msg(msg)
 }
 
-func ConfigLogger(level string) {
+func ConfigLogger(level, format string) {
 	// UNIX Time is faster and smaller than most timestamps
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	newLvl, err := zerolog.ParseLevel(level)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to parse log level")
-	} else {
-		zerolog.SetGlobalLevel(newLvl)
+	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+
+	// level is already parse on ValidateConfig
+	newLvl, _ := zerolog.ParseLevel(level)
+
+	// prevent slow down the process due to log write on console
+	wr := diode.NewWriter(os.Stdout, 1000, 10*time.Millisecond, func(missed int) {
+		fmt.Printf("Logger Dropped %d messages", missed)
+	})
+	Logger = zerolog.New(wr).With().
+		Timestamp(). // add timestamp that will be unix format (faster)
+		Caller().    // add caller to logs
+		Stack().     // add stack trace to errors only
+		Logger().
+		// prevent crazy amount of logs on debug
+		Sample(zerolog.LevelSampler{
+			DebugSampler: &zerolog.BurstSampler{
+				Burst:       5,
+				Period:      1 * time.Second,
+				NextSampler: &zerolog.BasicSampler{N: 100},
+			},
+		}).
+		Level(newLvl)
+
+	// Override the output to console
+	if format == LogTextFormat {
+		// replace global logger format
+		Logger = Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout})
+		Logger.Info().Str("format", format).Msg("switch logger format")
 	}
 }

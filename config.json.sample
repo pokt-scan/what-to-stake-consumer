@@ -1,27 +1,32 @@
 {
-  "what_to_stake_service": "WTS-ENDPOINT",
-  "network_id": "testnet",
-  "tx_memo": "wtsc",
+  "dry_mode": true,
+  "poktscan_api": "CHANGEME",
+  "poktscan_api_token": "CHANGEME",
+  "network_id": "CHANGEME",
+  "tx_memo": "",
   "tx_fee": 10000,
-  "domain": "PROVIDER-DOMAIN",
-  "chain_pool": [
-   "CHAIN_ID"
+  "domain": "CHANGEME",
+  "service_pool": [
+    "0021",
+    "0003"
   ],
   "servicer_keys": [
-    "PRIV_KEY"
+    "CHANGEME"
   ],
   "stake_weight": 4,
   "min_increase_percent": 5,
   "min_service_stake": [
     {
-      "service": "0021",
-      "min_node": 24
+      "service": "0001",
+      "min_node": 1
     }
   ],
-  "pocket_rpc": "POCKET_RPC_ENDPOINT",
+  "time_period": 24,
+  "results_path": "",
+  "pocket_rpc": "CHANGEME",
   "log_level": "debug",
-  "schedule": "@every 30s",
+  "schedule": "@every 5m",
   "max_workers": 1,
   "max_retries": 1,
-  "max_timeout": 60000
+  "max_timeout": 15000
 }
