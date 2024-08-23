@@ -46,8 +46,8 @@ type Config struct {
 	TxFee json.Number `json:"tx_fee"`
 	// Domain is Servicer domain to query what-to-stake
 	Domain string `json:"domain"`
-	// ChainPool list of the chains that are supported by the node runner.
-	ChainPool []string `json:"chain_pool"`
+	// ServicePool list of the service (aka chain) that are supported by the node runner.
+	ServicePool []string `json:"service_pool"`
 	// ServicerKeys list of the private keys to use for sign nodes
 	ServicerKeys []string `json:"servicer_keys"`
 	// StakeWeight the stake weight that will be sent to what-to-stake service

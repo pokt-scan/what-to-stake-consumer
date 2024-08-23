@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/pokt-scan/wtsc"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"net/http"
 	"os"
 
@@ -14,14 +13,6 @@ import (
 
 func main() {
 	cfg := wtsc.LoadConfig()
-
-	if valid, wrongKeys := wtsc.ValidateConfig(cfg); !valid {
-		log.Fatal().
-			Str("path", wtsc.GetConfigFilePath()).
-			Int("count", len(wrongKeys)).
-			Strs("keys", wrongKeys).
-			Msg("loaded config.json contains errors")
-	}
 
 	wtsc.AppConfig = cfg
 

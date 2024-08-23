@@ -49,14 +49,6 @@ func Run() {
 func main() {
 	cfg := wtsc.LoadConfig()
 
-	if valid, wrongKeys := wtsc.ValidateConfig(cfg); !valid {
-		wtsc.Logger.Fatal().
-			Str("path", wtsc.GetConfigFilePath()).
-			Int("count", len(wrongKeys)).
-			Strs("keys", wrongKeys).
-			Msg("loaded config.json contains errors")
-	}
-
 	wtsc.AppConfig = cfg
 
 	// Configure logger

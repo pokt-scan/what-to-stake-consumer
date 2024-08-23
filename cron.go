@@ -62,7 +62,7 @@ func evaluationJob() {
 
 	input := generated.WtsProcessRequestInput{
 		Domain:               AppConfig.Domain,
-		Service_pool:         AppConfig.ChainPool,
+		Service_pool:         AppConfig.ServicePool,
 		Min_increase_percent: AppConfig.MinIncreasePercent,
 		Stake_weight:         int(AppConfig.StakeWeight),
 		Min_service_stake:    AppConfig.MinServiceStake.CastToGqlType(),

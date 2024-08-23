@@ -6,7 +6,7 @@
   "tx_memo": "",
   "tx_fee": 10000,
   "domain": "CHANGEME",
-  "chain_pool": [
+  "service_pool": [
     "0021",
     "0003"
   ],

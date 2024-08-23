@@ -75,8 +75,8 @@ func ValidateConfig(cfg *Config) (valid bool, errors []string) {
 		errors = append(errors, "domain")
 	}
 
-	if !IsValidChainPool(cfg.ChainPool) {
-		errors = append(errors, "chain_pool")
+	if !IsValidChainPool(cfg.ServicePool) {
+		errors = append(errors, "service_pool")
 	}
 
 	if !IsValidServicerList(cfg.ServicerKeys) {
@@ -166,6 +166,14 @@ func LoadConfig() *Config {
 		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to unmarshal config file")
 	}
 
+	if valid, wrongKeys := ValidateConfig(&cfg); !valid {
+		Logger.Fatal().
+			Str("path", GetConfigFilePath()).
+			Int("count", len(wrongKeys)).
+			Strs("keys", wrongKeys).
+			Msg("loaded config.json contains errors")
+	}
+
 	return &cfg
 }
 
@@ -184,14 +192,6 @@ func ReloadConfig() {
 	var updateSchedule bool
 
 	uk := UpdateKeys{}
-
-	if valid, wrongKeys := ValidateConfig(newCfg); !valid {
-		Logger.Fatal().
-			Str("path", GetConfigFilePath()).
-			Int("count", len(wrongKeys)).
-			Strs("keys", wrongKeys).
-			Msg("loaded config.json contains errors")
-	}
 
 	if AppConfig.DryMode != newCfg.DryMode {
 		uk.Add("dry_mode")
@@ -229,9 +229,9 @@ func ReloadConfig() {
 		AppConfig.Domain = newCfg.Domain
 	}
 
-	if diff := GetStrSliceDiff(AppConfig.ChainPool, newCfg.ChainPool); len(diff) > 0 {
-		uk.Add("chain_pool")
-		AppConfig.ChainPool = newCfg.ChainPool
+	if diff := GetStrSliceDiff(AppConfig.ServicePool, newCfg.ServicePool); len(diff) > 0 {
+		uk.Add("service_pool")
+		AppConfig.ServicePool = newCfg.ServicePool
 	}
 
 	if diff := GetStrSliceDiff(AppConfig.ServicerKeys, newCfg.ServicerKeys); len(diff) > 0 {
