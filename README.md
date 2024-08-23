@@ -27,7 +27,7 @@ Before using the provided recommendations, it's important to understand several 
 1. Create a copy of `config.json.sample` and name it `config.json`.
 2. Edit `config.json` with your desired values.
 3. Generate the GraphQL types by running: `go generate`.
-4. Start the service with Docker: `docker compose up --build`.
+4. Start the service with Docker: `docker compose up --build`. Exists a docker image build with our CI available at https://hub.docker.com/repository/docker/poktscan/wtsc/general
 
 If you want/need to modify the path and name of the config file, please use `CONFIG_FILE` to override the default `./config.json`
 
