@@ -43,7 +43,8 @@ jobs:
             type=sha,format=long
 
       - name: Create config.json from secret
-        run: echo "${{ secrets.CONFIG_FILE }}" > config.json
+        run: |
+          echo "${{ secrets.CONFIG_FILE }}" | base64 --decode > config.json
 
       - name: Run go generate
         run: go generate ./...
