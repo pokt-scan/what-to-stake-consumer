@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/../pocket-core/.idea/pocket-core.iml" filepath="$PROJECT_DIR$/../pocket-core/.idea/pocket-core.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/what-to-stake-consumer.iml" filepath="$PROJECT_DIR$/.idea/what-to-stake-consumer.iml" />
     </modules>
   </component>
