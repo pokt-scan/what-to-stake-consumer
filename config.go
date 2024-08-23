@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,11 +20,27 @@ func (up *UpdateKeys) Add(key string) {
 	up.s = append(up.s, key)
 }
 
+func (up *UpdateKeys) Size() int {
+	return len(up.s)
+}
+
+func (up *UpdateKeys) Values() []string {
+	return up.s
+}
+
+// GetConfigFilePath returns the file path of the config.json file in the current working directory.
+// If there is an error while getting the working directory, it returns an empty string.
+// The file path is created by joining the working directory path and the file name "config.json".
 func GetConfigFilePath() string {
+	envConfigFilePath := os.Getenv("CONFIG_FILE")
+	if !IsEmptyString(envConfigFilePath) {
+		return envConfigFilePath
+	}
+
 	// Get the current working directory
 	workingDir, err := os.Getwd()
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get working dir")
+		Logger.Fatal().Err(err).Msg("failed to get working dir")
 		return ""
 	}
 
@@ -37,9 +52,9 @@ func GetConfigFilePath() string {
 }
 
 // ValidateConfig validates the provided configuration struct.
-// TODO: add as many validation as it needs here
 func ValidateConfig(cfg *Config) (valid bool, errors []string) {
-	// TODO: add as many validation as it needs here
+	Logger.Info().Msg("validating config file")
+
 	if !IsValidHttpURI(cfg.POKTscanApi) {
 		errors = append(errors, "poktscan_api")
 	}
@@ -127,27 +142,28 @@ func ValidateConfig(cfg *Config) (valid bool, errors []string) {
 func LoadConfig() *Config {
 	cfg := Config{}
 	var configPath = GetConfigFilePath()
+	Logger.Info().Str("path", configPath).Msg("reading config file")
 	var jsonFile *os.File
 	var bz []byte
 	if _, err := os.Stat(configPath); err != nil && os.IsNotExist(err) {
-		log.Fatal().Str("configPath", configPath).Msg("config file not found")
+		Logger.Fatal().Str("configPath", configPath).Msg("config file not found")
 	}
 	// reopen the file to read into the variable
 	jsonFile, err := os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, os.ModePerm)
 	if err != nil {
-		log.Fatal().Str("configPath", configPath).Err(err).Msg("failed to open config file")
+		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to open config file")
 	}
 	bz, err = io.ReadAll(jsonFile)
 	if err != nil {
-		log.Fatal().Str("configPath", configPath).Err(err).Msg("failed to read config file")
+		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to read config file")
 	}
 	err = jsonFile.Close()
 	if err != nil {
-		log.Fatal().Str("configPath", configPath).Err(err).Msg("failed to close config file")
+		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to close config file")
 	}
 	err = json.Unmarshal(bz, &cfg)
 	if err != nil {
-		log.Fatal().Str("configPath", configPath).Err(err).Msg("failed to unmarshal config file")
+		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to unmarshal config file")
 	}
 
 	return &cfg
@@ -155,8 +171,10 @@ func LoadConfig() *Config {
 
 // ReloadConfig updates the provided configuration based on changes detected in a new configuration.
 func ReloadConfig() {
-	log.Debug().Msg("Reloading configuration")
+	Logger.Info().Msg("looking for changes on config file")
+
 	newCfg := LoadConfig()
+
 	var updatePOKTscanClient bool
 	var updatePocketProvider bool
 	var updateHttpClient bool
@@ -168,7 +186,7 @@ func ReloadConfig() {
 	uk := UpdateKeys{}
 
 	if valid, wrongKeys := ValidateConfig(newCfg); !valid {
-		log.Fatal().
+		Logger.Fatal().
 			Str("path", GetConfigFilePath()).
 			Int("count", len(wrongKeys)).
 			Strs("keys", wrongKeys).
@@ -281,6 +299,13 @@ func ReloadConfig() {
 		updateHttpClient = true
 	}
 
+	if uk.Size() == 0 {
+		Logger.Debug().Msg("config file look the same as before.")
+		return
+	}
+
+	Logger.Info().Strs("changed_keys", uk.Values()).Msg("changes are detected on config file, proceeding to update elements")
+
 	if updateSigners {
 		if index, err := UpdateServicers(AppConfig.ServicerKeys); err != nil {
 			// update on the fly, no other config modify it
@@ -292,9 +317,10 @@ func ReloadConfig() {
 	}
 
 	if updateWorker {
+		Logger.Info().Msg("updating worker pool")
 		waitingTasks := WorkerPool.WaitingTasks()
 		if waitingTasks > 0 {
-			log.Error().Uint64("waiting_tasks", waitingTasks).Msg("unable to update worker pool due to it has waiting tasks. will be retried on next round.")
+			Logger.Error().Uint64("waiting_tasks", waitingTasks).Msg("unable to update worker pool due to it has waiting tasks. will be retried on next round.")
 		} else {
 			WorkerPool.StopAndWait()
 			// max capacity will always be the same of servicer keys
@@ -305,9 +331,10 @@ func ReloadConfig() {
 	}
 
 	if updateSchedule {
+		Logger.Info().Msg("updating schedule")
 		err := ReSchedule(newCfg.Schedule) // update on the fly, no other config modify it
 		if err != nil {
-			log.Error().Err(err).Msg("failed to reschedule. check your schedule config.")
+			Logger.Error().Err(err).Msg("failed to reschedule. check your schedule config.")
 		} else {
 			// assign to AppConfig reference the new value.
 			AppConfig.Schedule = newCfg.Schedule
@@ -315,12 +342,14 @@ func ReloadConfig() {
 	}
 
 	if updateLogger {
+		Logger.Info().Msg("updating logger")
 		ConfigLogger(newCfg.LogLevel, newCfg.LogFormat)
 		AppConfig.LogFormat = newCfg.LogFormat
 		AppConfig.LogLevel = newCfg.LogLevel
 	}
 
 	if updateHttpClient {
+		Logger.Info().Msg("updating http client")
 		NewHttpClient(newCfg.POKTscanApiToken, newCfg.MaxRetries, newCfg.MaxTimeout)
 		AppConfig.POKTscanApiToken = newCfg.POKTscanApiToken
 		AppConfig.MaxRetries = newCfg.MaxRetries
@@ -328,12 +357,14 @@ func ReloadConfig() {
 	}
 
 	if updatePocketProvider {
+		Logger.Info().Msg("updating pocket rpc")
 		NewPocketRpcProvider(newCfg.PocketRPC, newCfg.MaxRetries, newCfg.MaxTimeout)
 		// update rpc url, but if retries or timeout was modified will be already update by previous if
 		AppConfig.PocketRPC = newCfg.PocketRPC
 	}
 
 	if updatePOKTscanClient {
+		Logger.Info().Msg("updating poktscan api")
 		// this one also update the basic client.
 		NewPOKTscanClient(newCfg.POKTscanApi)
 		// update poktscan api url

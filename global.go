@@ -12,7 +12,6 @@ import (
 	"github.com/puzpuzpuz/xsync"
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -32,6 +31,9 @@ var (
 
 // UpdateServicers adds new servicers to the servicers map and removes orphaned servicers from the map.
 func UpdateServicers(servicers []string) (int, error) {
+	Logger.Info().Msg("updating signer map")
+	currentSignerMapSize := ServicersMap.Size()
+
 	// add new
 	signers := make([]*pocketGoSigner.Signer, 0)
 	for i, key := range servicers {
@@ -43,11 +45,13 @@ func UpdateServicers(servicers []string) (int, error) {
 	}
 
 	// do a second round of iter here to prevent update the map if we get error on any signer.
+	added := 0
 	for _, signer := range signers {
 		_, found := ServicersMap.LoadOrStore(signer.GetAddress(), signer)
 
 		if !found {
-			log.Debug().Str("address", signer.GetAddress()).Msg("signer added")
+			added++
+			Logger.Debug().Str("address", signer.GetAddress()).Msg("signer added")
 		}
 	}
 
@@ -65,10 +69,20 @@ func UpdateServicers(servicers []string) (int, error) {
 		ServicersMap.Delete(address)
 	}
 
+	if currentSignerMapSize > 0 {
+		Logger.Debug().
+			Int("added", added).
+			Int("removed", len(toRemove)).
+			Msg("signer map updated")
+	} else {
+		Logger.Debug().Int("added", added).Msg("signer map loaded")
+	}
+
 	return -1, nil
 }
 
 func NewWorker(maxWorkers, maxCapacity uint) {
+	Logger.Info().Msg("preparing worker pool")
 	WorkerPool = pond.New(
 		int(maxWorkers),                        // max amount of parallel workers (configurable by config.json)
 		int(maxCapacity),                       // max amount of tasks in queue before block, it will be the amount of servicers
@@ -84,6 +98,7 @@ func NewWorker(maxWorkers, maxCapacity uint) {
 }
 
 func NewSignerMap(servicerKeys []string) {
+	Logger.Info().Msg("preparing signer map")
 	ServicersMap = xsync.NewMapOf[*pocketGoSigner.Signer]()
 	if index, err := UpdateServicers(servicerKeys); err != nil {
 		// stop everything
@@ -92,9 +107,10 @@ func NewSignerMap(servicerKeys []string) {
 }
 
 func NewHttpClient(token string, maxRetries, maxTimeout uint) {
+	Logger.Info().Msg("preparing http client")
 	HttpClient = retryablehttp.NewClient()
 	HttpClient.CheckRetry = func(ctx context.Context, resp *http.Response, err error) (bool, error) {
-		if err != nil {
+		if err != nil || resp.StatusCode == http.StatusOK {
 			return false, err
 		}
 
@@ -106,7 +122,7 @@ func NewHttpClient(token string, maxRetries, maxTimeout uint) {
 			// X-Long-RateLimit-Limit: The total amount of credits available in the API token for the long rate limiter.
 			// X-Long-RateLimit-Remaining: The amount of spendable credits remaining in the API token for the current month.
 			// X-Long-RateLimit-Consumed-Points: The amount of credits consumed in the request for the long rate limiter.
-			log.Warn().
+			Logger.Warn().
 				Str("Retry-After", resp.Header.Get("Retry-After")).
 				Str("X-RateLimit-Limit", resp.Header.Get("X-RateLimit-Limit")).
 				Str("X-RateLimit-Remaining", resp.Header.Get("X-RateLimit-Remaining")).
@@ -125,7 +141,7 @@ func NewHttpClient(token string, maxRetries, maxTimeout uint) {
 		return true, nil
 	}
 	HttpClient.RetryMax = int(maxRetries)
-	HttpClient.Logger = NewZerologLeveledLogger()
+	HttpClient.Logger = NewZerologLeveledLogger(Logger)
 	HttpClient.HTTPClient.Timeout = time.Duration(maxTimeout) * time.Millisecond
 	HttpClient.HTTPClient.Transport = &AuthedTransport{
 		token: token,
@@ -135,6 +151,7 @@ func NewHttpClient(token string, maxRetries, maxTimeout uint) {
 }
 
 func NewPOKTscanClient(url string) {
+	Logger.Info().Msg("preparing poktscan api client")
 	gClient := graphql.NewClient(url, HttpClient.StandardClient())
 	POKTscanApiClient = &gClient
 }

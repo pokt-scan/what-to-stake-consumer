@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/pokt-scan/wtsc/generated"
 	"github.com/robfig/cron/v3"
-	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
 	"time"
@@ -51,10 +50,12 @@ func writeResults(result *generated.GetWhatToStakeResponse) {
 		Logger.Error().Err(err).Str("path", fullPath).Msg("error writing to file")
 		return
 	}
+
+	Logger.Info().Str("path", fullPath).Msg("writing results to file")
 }
 
 func evaluationJob() {
-	log.Info().Msg("Running evaluation job")
+	Logger.Info().Msg("running evaluation")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(AppConfig.MaxTimeout)*time.Millisecond)
 	defer cancel()
@@ -68,32 +69,32 @@ func evaluationJob() {
 		Time_period:          int(AppConfig.TimePeriod),
 	}
 
-	log.Info().Msg("calling what to stake service")
+	Logger.Info().Msg("calling what to stake service")
 	resp, err := generated.GetWhatToStake(ctx, *POKTscanApiClient, input)
 
 	if err != nil {
-		log.Error().Err(err).Str("service", AppConfig.POKTscanApi).Msg("Failed to call what to stake service")
+		Logger.Error().Err(err).Str("service", AppConfig.POKTscanApi).Msg("failed to call what to stake service")
 		return
 	}
 
 	if IsEmptyString(AppConfig.ResultsPath) {
 		resultStr, e := json.Marshal(resp)
 		if e != nil {
-			log.Error().Err(e).Msg("Failed to marshal results")
+			Logger.Error().Err(e).Msg("failed to marshal results")
 		} else {
-			log.Debug().Str("result", string(resultStr)).Msg("What To Stake Results")
+			Logger.Debug().Str("result", string(resultStr)).Msg("what to stake results")
 		}
 	} else {
 		writeResults(resp)
 	}
 
 	if AppConfig.DryMode {
-		log.Info().Msg("DRY MODE is on, omitting stake transactions.")
+		Logger.Info().Msg("DRY MODE is on, omitting stake transactions.")
 		return
 	}
 
 	if !resp.GetWhatToStake.Do_update {
-		log.Info().Msg("What-To-Stake thinks you does not need to update yet.")
+		Logger.Info().Msg("What-To-Stake thinks you does not need to update yet.")
 		return
 	}
 
@@ -102,7 +103,7 @@ func evaluationJob() {
 
 	for _, wtsServicer := range resp.GetWhatToStake.Servicers {
 		if signer, ok := ServicersMap.Load(wtsServicer.Address); !ok {
-			log.Warn().Str("address", wtsServicer.Address).Msg("Failed to find signer")
+			Logger.Warn().Str("address", wtsServicer.Address).Msg("Failed to find signer")
 			continue
 		} else {
 			group.Submit(StakeServicer(signer, &wtsServicer))
@@ -114,10 +115,11 @@ func evaluationJob() {
 }
 
 func Schedule(frequency string) (entry cron.EntryID, err error) {
+	Logger.Info().Msg("preparing cron job")
 	CronJob = cron.New()
 	// Define the job
 	entry, err = CronJob.AddFunc(frequency, evaluationJob)
-	log.Debug().Int("ScheduleID", int(entry)).Msg("scheduled job")
+	Logger.Debug().Int("schedule_id", int(entry)).Msg("scheduled job detail")
 	// Start the cron job
 	CronJob.Start()
 	return
@@ -137,7 +139,7 @@ func ReSchedule(frequency string) error {
 		return err
 	}
 
-	log.Debug().Int("NewScheduleID", int(entryId)).Msg("re-scheduled job")
+	Logger.Debug().Int("NewScheduleID", int(entryId)).Msg("re-scheduled job")
 
 	return nil
 }

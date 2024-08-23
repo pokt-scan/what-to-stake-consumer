@@ -38,16 +38,16 @@ func main() {
 	)
 
 	if err != nil {
-		log.Error().Err(err).Msg("failed to build schema")
+		wtsc.Logger.Error().Err(err).Msg("failed to build schema")
 		os.Exit(1)
 	}
 
 	if err = os.WriteFile("./generated/schema.graphql", []byte(schema), 0644); err != nil {
-		log.Error().Err(err).Msg("failed write schema.graphql")
+		wtsc.Logger.Error().Err(err).Msg("failed write schema.graphql")
 		os.Exit(1)
 	}
 
 	generate.Main()
-	log.Info().Msg("types generated from poktscan graphql schema")
+	wtsc.Logger.Info().Msg("types generated from poktscan graphql schema")
 	os.Exit(0)
 }

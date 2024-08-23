@@ -21,7 +21,6 @@ import (
 	pocketCoreNodesTypes "github.com/pokt-network/pocket-core/x/nodes/types"
 	pocketCore "github.com/pokt-network/pocket-core/x/pocketcore"
 	"github.com/pokt-scan/wtsc/generated"
-	"github.com/rs/zerolog/log"
 	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"math"
 	"math/big"
@@ -102,15 +101,15 @@ func StakeServicer(
 ) func() {
 	return func() {
 		// stake
-		log.Debug().Str("address", signer.GetAddress()).Msg("reading node from rpc")
+		Logger.Debug().Str("address", signer.GetAddress()).Msg("reading node from rpc")
 		node, err := PocketRpcProvider.GetNode(servicer.Address, &pocketGoProvider.GetNodeOptions{Height: 0})
 		if err != nil {
-			log.Error().Err(err).Str("address", servicer.Address).Msg("failed to get pocket node")
+			Logger.Error().Err(err).Str("address", servicer.Address).Msg("failed to get pocket node")
 			return
 		}
 		nodeTokens, err := strconv.ParseInt(node.Tokens, 10, 64)
 		if err != nil {
-			log.Error().Err(err).Str("address", servicer.Address).Str("tokens", node.Tokens).Msg("failed to parse pocket node tokens")
+			Logger.Error().Err(err).Str("address", servicer.Address).Str("tokens", node.Tokens).Msg("failed to parse pocket node tokens")
 			return
 		}
 
@@ -134,7 +133,7 @@ func StakeServicer(
 
 		// Instead I basically copy&paste just importing the codec things to allows handle the transaction properly.
 		if err != nil {
-			log.Error().Err(err).Msg("failed to create stake node tx message")
+			Logger.Error().Err(err).Msg("failed to create stake node tx message")
 			return
 		}
 
@@ -153,19 +152,19 @@ func StakeServicer(
 
 		entropy, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 		if err != nil {
-			log.Error().Err(err).Msg("failed to generate entropy")
+			Logger.Error().Err(err).Msg("failed to generate entropy")
 			return
 		}
 
 		cryptoPublicKey, err := pocketCoreCrypto.NewPublicKey(signer.GetPublicKey())
 		if err != nil {
-			log.Error().Err(err).Msg("failed to create crypto")
+			Logger.Error().Err(err).Msg("failed to create crypto")
 			return
 		}
 
 		decodedAddress, err := hex.DecodeString(node.OutputAddress)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to decode output address")
+			Logger.Error().Err(err).Msg("failed to decode output address")
 		}
 
 		txMsg := &pocketCoreNodesTypes.MsgStake{
@@ -178,13 +177,13 @@ func StakeServicer(
 
 		signBytes, err := pocketCoreAuth.StdSignBytes(AppConfig.NetworkID, entropy.Int64(), feeStruct, txMsg, AppConfig.TxMemo)
 		if err != nil {
-			log.Error().Err(err).Msg("")
+			Logger.Error().Err(err).Msg("")
 			return
 		}
 
 		signature, err := signer.SignBytes(signBytes)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to sign transaction")
+			Logger.Error().Err(err).Msg("failed to sign transaction")
 			return
 		}
 
@@ -203,11 +202,11 @@ func StakeServicer(
 		txResult, txErr := PocketRpcProvider.SendTransactionWithCtx(ctx, sendTransactionInput)
 
 		if txErr != nil {
-			log.Error().Err(txErr).Msg("failed to submit stake node transaction")
+			Logger.Error().Err(txErr).Msg("failed to submit stake node transaction")
 			return
 		}
 
-		log.Info().
+		Logger.Info().
 			Str("address", signer.GetAddress()).
 			Strs("chains", servicer.Services).
 			Str("height", txResult.Height).
@@ -218,6 +217,7 @@ func StakeServicer(
 }
 
 func NewPocketRpcProvider(url string, maxRetries, maxTimeout uint) {
+	Logger.Info().Msg("preparing pocket rpc client")
 	// create a pocket rpc provider to reuse it
 	PocketRpcProvider = pocketGoProvider.NewProvider(url)
 	PocketRpcProvider.UpdateRequestConfig(pocketGoProvider.RequestConfigOpts{

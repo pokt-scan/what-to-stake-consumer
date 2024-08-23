@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/diode"
-	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
 	"os"
 	"time"
@@ -21,9 +20,9 @@ type ZerologLeveledLogger struct {
 }
 
 // NewZerologLeveledLogger creates a new ZerologLeveledLogger
-func NewZerologLeveledLogger() *ZerologLeveledLogger {
+func NewZerologLeveledLogger(l zerolog.Logger) *ZerologLeveledLogger {
 	return &ZerologLeveledLogger{
-		logger: log.Output(zerolog.ConsoleWriter{Out: os.Stderr}),
+		logger: l,
 	}
 }
 
@@ -76,6 +75,8 @@ func ConfigLogger(level, format string) {
 
 	// Override the output to console
 	if format == LogTextFormat {
-		Logger = Logger.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		// replace global logger format
+		Logger = Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout})
+		Logger.Info().Str("format", format).Msg("switch logger format")
 	}
 }

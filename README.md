@@ -29,6 +29,8 @@ Before using the provided recommendations, it's important to understand several 
 3. Generate the GraphQL types by running: `go generate`.
 4. Start the service with Docker: `docker compose up --build`.
 
+If you want/need to modify the path and name of the config file, please use `CONFIG_FILE` to override the default `./config.json`
+
 ### Understanding `config.json` Values
 
 ```json
