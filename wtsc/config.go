@@ -13,6 +13,11 @@ type UpdateKeys struct {
 	s []string
 }
 
+var (
+	ProjectRoot    string
+	ConfigFilePath string
+)
+
 func (up *UpdateKeys) Add(key string) {
 	if up.s == nil {
 		up.s = make([]string, 0)
@@ -32,23 +37,26 @@ func (up *UpdateKeys) Values() []string {
 // If there is an error while getting the working directory, it returns an empty string.
 // The file path is created by joining the working directory path and the file name "config.json".
 func GetConfigFilePath() string {
-	envConfigFilePath := os.Getenv("CONFIG_FILE")
-	if !IsEmptyString(envConfigFilePath) {
-		return envConfigFilePath
+	// Check if the environment variable is set
+	ProjectRoot = os.Getenv("PROJECT_ROOT")
+	if ProjectRoot == "" {
+		// Fallback to current working directory if the env variable is not set
+		var err error
+		ProjectRoot, err = os.Getwd()
+		if err != nil {
+			Logger.Fatal().Err(err).Msg("failed to get working dir")
+		}
 	}
 
-	// Get the current working directory
-	workingDir, err := os.Getwd()
-	if err != nil {
-		Logger.Fatal().Err(err).Msg("failed to get working dir")
-		return ""
+	fileName := os.Getenv("CONFIG_FILE")
+	if IsEmptyString(fileName) {
+		fileName = "config.json"
 	}
 
 	// Create a path to the file in the working directory
-	fileName := "config.json"
-	filePath := filepath.Join(workingDir, fileName)
+	ConfigFilePath = filepath.Join(ProjectRoot, fileName)
 
-	return filePath
+	return ConfigFilePath
 }
 
 // ValidateConfig validates the provided configuration struct.
@@ -99,7 +107,7 @@ func ValidateConfig(cfg *Config) (valid bool, errors []string) {
 		errors = append(errors, "time_period")
 	}
 
-	if !IsEmptyString(cfg.ResultsPath) && !IsWritableDirectory(cfg.ResultsPath) {
+	if !IsEmptyString(cfg.ResultsPath) && !IsWritableDirectory(filepath.Join(ProjectRoot, cfg.ResultsPath)) {
 		// empty string disable the feature so it's ok been empty
 		errors = append(errors, "results_path")
 	}
@@ -133,7 +141,7 @@ func ValidateConfig(cfg *Config) (valid bool, errors []string) {
 		errors = append(errors, "max_retries")
 	}
 
-	valid = true
+	valid = len(errors) == 0
 
 	return
 }
@@ -146,24 +154,24 @@ func LoadConfig() *Config {
 	var jsonFile *os.File
 	var bz []byte
 	if _, err := os.Stat(configPath); err != nil && os.IsNotExist(err) {
-		Logger.Fatal().Str("configPath", configPath).Msg("config file not found")
+		Logger.Fatal().Str("path", configPath).Msg("config file not found")
 	}
 	// reopen the file to read into the variable
-	jsonFile, err := os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, os.ModePerm)
+	jsonFile, err := os.OpenFile(configPath, os.O_RDONLY, os.ModePerm)
 	if err != nil {
-		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to open config file")
+		Logger.Fatal().Str("path", configPath).Err(err).Msg("failed to open config file")
 	}
 	bz, err = io.ReadAll(jsonFile)
 	if err != nil {
-		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to read config file")
+		Logger.Fatal().Str("path", configPath).Err(err).Msg("failed to read config file")
 	}
 	err = jsonFile.Close()
 	if err != nil {
-		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to close config file")
+		Logger.Fatal().Str("path", configPath).Err(err).Msg("failed to close config file")
 	}
 	err = json.Unmarshal(bz, &cfg)
 	if err != nil {
-		Logger.Fatal().Str("configPath", configPath).Err(err).Msg("failed to unmarshal config file")
+		Logger.Fatal().Str("path", configPath).Err(err).Msg("failed to unmarshal config file")
 	}
 
 	if valid, wrongKeys := ValidateConfig(&cfg); !valid {

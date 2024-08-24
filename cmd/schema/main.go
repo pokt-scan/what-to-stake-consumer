@@ -2,19 +2,18 @@ package main
 
 import (
 	"context"
-	"github.com/pokt-scan/wtsc"
+	"github.com/Khan/genqlient/generate"
+	"github.com/pokt-scan/wtsc/wtsc"
 	"github.com/rs/zerolog"
+	"github.com/suessflorian/gqlfetch"
 	"net/http"
 	"os"
-
-	"github.com/Khan/genqlient/generate"
-	"github.com/suessflorian/gqlfetch"
+	"path/filepath"
 )
 
 func main() {
-	cfg := wtsc.LoadConfig()
-
-	wtsc.AppConfig = cfg
+	// Initialize wtsc
+	wtsc.Init()
 
 	// Configure logger
 	wtsc.ConfigLogger(zerolog.InfoLevel.String(), wtsc.LogTextFormat)
@@ -33,7 +32,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = os.WriteFile("./generated/schema.graphql", []byte(schema), 0644); err != nil {
+	if err = os.WriteFile(filepath.Join(wtsc.ProjectRoot, "wtsc", "generated", "schema.graphql"), []byte(schema), 0644); err != nil {
 		wtsc.Logger.Error().Err(err).Msg("failed write schema.graphql")
 		os.Exit(1)
 	}

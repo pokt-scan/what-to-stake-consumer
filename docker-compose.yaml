@@ -4,8 +4,14 @@ services:
   wtsc:
     build:
       context: .
+    environment:
+      - RELOAD_SECONDS=${RELOAD_SECONDS:-30}
+      - VERSION=${VERSION}
     volumes:
-      - ./config.json:/app/config.json
+      - ${CONFIG_FILE_PATH:-./config.json}:/app/config.json
       - ./results:/app/results
-    image: poktscan/wtsc:local
+    image: poktscan/wtsc:latest
+    # will force the build, normally hit cache next times.
+    # replace for always if you want to pull it from remote (dockerhub or so on)
+    pull_policy: build
     container_name: wtsc

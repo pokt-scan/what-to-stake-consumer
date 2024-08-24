@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/pokt-scan/wtsc"
+	"github.com/pokt-scan/wtsc/wtsc"
 	"github.com/rs/zerolog/log"
 	"os"
 	"os/signal"
@@ -47,9 +47,8 @@ func Run() {
 }
 
 func main() {
-	cfg := wtsc.LoadConfig()
-
-	wtsc.AppConfig = cfg
+	// Initialize wtsc
+	wtsc.Init()
 
 	// Configure logger
 	wtsc.ConfigLogger(wtsc.AppConfig.LogLevel, wtsc.AppConfig.LogFormat)
@@ -64,13 +63,13 @@ func main() {
 	wtsc.NewPocketRpcProvider(wtsc.AppConfig.PocketRPC, wtsc.AppConfig.MaxRetries, wtsc.AppConfig.MaxTimeout)
 
 	// Initialize the worker pool
-	wtsc.NewWorker(cfg.MaxWorkers, uint(len(cfg.ServicerKeys)))
+	wtsc.NewWorker(wtsc.AppConfig.MaxWorkers, uint(len(wtsc.AppConfig.ServicerKeys)))
 
 	// Initialize the servicers map
-	wtsc.NewSignerMap(cfg.ServicerKeys)
+	wtsc.NewSignerMap(wtsc.AppConfig.ServicerKeys)
 
 	// Initialize the cron job
-	_, err := wtsc.Schedule(cfg.Schedule)
+	_, err := wtsc.Schedule(wtsc.AppConfig.Schedule, wtsc.AppConfig.RunOnceAtStart)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to schedule cron job")
 	}

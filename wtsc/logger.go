@@ -1,9 +1,9 @@
 package wtsc
 
 import (
-	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/diode"
+	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
 	"os"
 	"time"
@@ -46,19 +46,16 @@ func (l *ZerologLeveledLogger) Warn(msg string, keysAndValues ...interface{}) {
 	l.logger.Warn().Fields(keysAndValues).Msg(msg)
 }
 
-func ConfigLogger(level, format string) {
+func GetDefaultLogger() zerolog.Logger {
 	// UNIX Time is faster and smaller than most timestamps
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
-
-	// level is already parse on ValidateConfig
-	newLvl, _ := zerolog.ParseLevel(level)
-
 	// prevent slow down the process due to log write on console
 	wr := diode.NewWriter(os.Stdout, 1000, 10*time.Millisecond, func(missed int) {
-		fmt.Printf("Logger Dropped %d messages", missed)
+		log.Warn().Msgf("Logger Dropped %d messages", missed)
 	})
-	Logger = zerolog.New(wr).With().
+
+	return zerolog.New(wr).With().
 		Timestamp(). // add timestamp that will be unix format (faster)
 		Caller().    // add caller to logs
 		Stack().     // add stack trace to errors only
@@ -71,7 +68,14 @@ func ConfigLogger(level, format string) {
 				NextSampler: &zerolog.BasicSampler{N: 100},
 			},
 		}).
-		Level(newLvl)
+		Output(zerolog.ConsoleWriter{Out: os.Stdout})
+}
+
+func ConfigLogger(level, format string) {
+	// level is already parse on ValidateConfig
+	newLvl, _ := zerolog.ParseLevel(level)
+
+	Logger = GetDefaultLogger().Level(newLvl)
 
 	// Override the output to console
 	if format == LogTextFormat {
