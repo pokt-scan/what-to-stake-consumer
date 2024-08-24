@@ -4,7 +4,7 @@ package wtsc
 
 import (
 	"encoding/json"
-	"github.com/pokt-scan/wtsc/generated"
+	"github.com/pokt-scan/wtsc/wtsc/generated"
 	"net/http"
 )
 
@@ -69,6 +69,8 @@ type Config struct {
 	// Schedule is the cron schedule. Allow @every 1m or cron text.
 	// Refer to: https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format
 	Schedule string `json:"schedule"`
+	// Allow wtsc to run the evaluation job once at startup and schedule the next. Otherwise first job is run at `schedule`
+	RunOnceAtStart bool `json:"run_once_at_start"`
 	// Worker Pool config
 	MaxWorkers uint `json:"max_workers"`
 	// PocketRPC url to call /v1/query/nodes & /v1/client/rawTx

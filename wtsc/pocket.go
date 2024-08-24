@@ -20,7 +20,7 @@ import (
 	pocketCoreNodes "github.com/pokt-network/pocket-core/x/nodes"
 	pocketCoreNodesTypes "github.com/pokt-network/pocket-core/x/nodes/types"
 	pocketCore "github.com/pokt-network/pocket-core/x/pocketcore"
-	"github.com/pokt-scan/wtsc/generated"
+	"github.com/pokt-scan/wtsc/wtsc/generated"
 	cryptoamino "github.com/tendermint/tendermint/crypto/encoding/amino"
 	"math"
 	"math/big"
@@ -83,10 +83,6 @@ func IsValidServicerList(servicerList []string, isDryMode bool) bool {
 }
 
 func IsValidMinServiceStake(minServiceStakeList MinServiceStake) bool {
-	if len(minServiceStakeList) == 0 {
-		return false
-	}
-
 	for _, minServiceStake := range minServiceStakeList {
 		if err := pocketCoreNodesTypes.ValidateNetworkIdentifier(minServiceStake.Service); err != nil {
 			return false
@@ -113,7 +109,6 @@ func StakeServicer(
 			Logger.Error().Err(err).Str("address", servicer.Address).Str("tokens", node.Tokens).Msg("failed to parse pocket node tokens")
 			return
 		}
-
 		// --- @NOTE: this should be the required code using pocket-go package but fail due to some unnecessary imports
 		//txBuilder := pocketGoTxBuilder.NewTransactionBuilder(pocketRpcProvider, signer)
 		//
@@ -169,11 +164,12 @@ func StakeServicer(
 		}
 
 		txMsg := &pocketCoreNodesTypes.MsgStake{
-			PublicKey:  cryptoPublicKey,
-			Chains:     servicer.Services, // aka chains on morse
-			Value:      pocketCoreTypes.NewInt(nodeTokens),
-			ServiceUrl: node.ServiceURL,
-			Output:     decodedAddress,
+			PublicKey:        cryptoPublicKey,
+			Chains:           servicer.Services, // aka chains on morse
+			Value:            pocketCoreTypes.NewInt(nodeTokens),
+			ServiceUrl:       node.ServiceURL,
+			Output:           decodedAddress,
+			RewardDelegators: node.RewardDelegators,
 		}
 
 		signBytes, err := pocketCoreAuth.StdSignBytes(AppConfig.NetworkID, entropy.Int64(), feeStruct, txMsg, AppConfig.TxMemo)

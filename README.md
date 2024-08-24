@@ -8,6 +8,7 @@ This tool provides optimal* deployments of a series of nodes in the POKT Network
 - [Important Warning](#important-warning)
 - [Requirements](#requirements)
 - [How To Use](#how-to-use)
+- [Using the Makefile](#using-the-makefile)
 - [Understanding `config.json` Values](#understanding-configjson-values)
 - [Available Environment Variables](#available-environment-variables)
 - [FAQ](#faq)
@@ -40,45 +41,106 @@ Before using the provided recommendations, it's important to understand several 
 
 1. Create a copy of `config.json.sample` and name it `config.json`.
 2. Edit `config.json` with your desired values. **Make sure to set `dry_mode` to `true` initially to understand the tool's behavior without making any changes.**
-3. Generate the GraphQL types by running: `go generate`.
+3. Generate the GraphQL types by running: `make generate`.
 4. Start the service with Docker:
     ```sh
-    docker compose up --build
+    make start_docker
     ```
    An existing Docker image build is available at [Docker Hub](https://hub.docker.com/repository/docker/poktscan/wtsc/general).
 
 If you want/need to modify the path and name of the config file, please use `CONFIG_FILE` to override the default `./config.json`.
 
+### Using the Makefile
+
+The provided `Makefile` includes several targets that help manage the project lifecycle, including generating code, building the project, and managing Docker containers. Below are the available targets and how to use them:
+
+#### Targets
+
+- **generate**: Generates POKTscan GraphQL schema types.
+  ```sh
+  make generate
+  ```
+
+- **build**: Builds the WTSC project after generating the necessary types.
+  ```sh
+  make build
+  ```
+
+- **build_docker**: Builds the WTSC Docker image using Docker Compose.
+  ```sh
+  make build_docker
+  ```
+
+- **build_docker_no_cache**: Builds the WTSC Docker image without using the cache.
+  ```sh
+  make build_docker_no_cache
+  ```
+
+- **start**: Builds and starts the WTSC project on the host.
+  ```sh
+  make start
+  ```
+
+- **start_docker**: Starts the WTSC project in a Docker container using Docker Compose (without detaching the terminal).
+  ```sh
+  make start_docker
+  ```
+
+- **start_as_daemon**: Starts the WTSC project in a Docker container using Docker Compose (detached mode).
+  ```sh
+  make start_as_daemon
+  ```
+
+- **stop_docker**: Stops the WTSC Docker container without destroying it.
+  ```sh
+  make stop_docker
+  ```
+
+- **down**: Stops and removes the WTSC Docker container and associated volumes.
+  ```sh
+  make down
+  ```
+
 ### Understanding `config.json` Values
 
-| Parameter            | Type                | Description                                                                                                      |
-|----------------------|---------------------|------------------------------------------------------------------------------------------------------------------|
-| dry_mode             | boolean             | If true, calls to "What to Stake" will write results to `results_path` or print them if `results_path` is empty. |
-| poktscan_api         | string              | POKTscan API endpoint                                                                                            |
-| poktscan_api_token   | string              | POKTscan API token                                                                                               |
-| network_id           | string              | Can be "mainnet" or "testnet"                                                                                    |
-| tx_memo              | string              | Transaction memo                                                                                                 |
-| tx_fee               | integer             | Transaction fee                                                                                                  |
-| domain               | string              | Your node's domain (e.g., "poktscan.cloud" or "c0d3r.org")                                                       |
-| service_pool         | array of strings    | Service IDs (aka chain on morse) available in your fleet                                                         |
-| servicer_keys        | array of strings    | List of private keys for signing stake transactions                                                              |
-| stake_weight         | integer             | Used by the "What to Stake" service to estimate potential rewards (1-4)                                          |
-| min_increase_percent | integer             | Minimum percentage increase expected to process stakes                                                           |
-| min_service_stake    | array of objects    | Minimum number of nodes for specific services `{"service":"<service_id>", "min_node": <int>}`. Empty is allowed  |
-| time_period          | integer             | Time in hours to consider for relay averages                                                                     |
-| results_path         | string              | Path to save "What to Stake" results (empty to disable)                                                          |
-| pocket_rpc           | string              | Pocket node or load balancer URL                                                                                 |
-| log_level            | string              | Log level                                                                                                        |
-| log_format           | string              | Log format (json or colorized text)                                                                              |
-| schedule             | string              | Frequency of the "What to Stake" service calls                                                                   |
-| max_workers          | integer             | Number of workers to process stake transactions in parallel                                                      |
-| max_retries          | integer             | Number of retries for HTTP calls (POKTscan API or Pocket RPC)                                                    |
-| max_timeout          | integer             | Timeout in milliseconds for HTTP calls                                                                           |
+| Parameter            | Type             | Description                                                                                                          |
+|----------------------|------------------|----------------------------------------------------------------------------------------------------------------------|
+| dry_mode             | boolean          | If true, calls to "What to Stake" will write results to `results_path` or print them if `results_path` is empty.     |
+| poktscan_api         | string           | POKTscan API endpoint                                                                                                |
+| poktscan_api_token   | string           | POKTscan API token                                                                                                   |
+| network_id           | string           | Can be "mainnet" or "testnet"                                                                                        |
+| tx_memo              | string           | Transaction memo                                                                                                     |
+| tx_fee               | integer          | Transaction fee                                                                                                      |
+| domain               | string           | Your node's domain (e.g., "poktscan.cloud" or "c0d3r.org")                                                           |
+| service_pool         | array of strings | Service IDs (aka chain on morse) available in your fleet                                                             |
+| servicer_keys        | array of strings | List of private keys for signing stake transactions                                                                  |
+| stake_weight         | integer          | Used by the "What to Stake" service to estimate potential rewards (1-4)                                              |
+| min_increase_percent | integer          | Minimum percentage increase expected to process stakes                                                               |
+| min_service_stake    | array of objects | Minimum number of nodes for specific services `{"service":"<service_id>", "min_node": <int>}`. Empty is allowed      |
+| time_period          | integer          | Time in hours to consider for relay averages                                                                         |
+| results_path         | string           | Path to save "What to Stake" results (empty to disable)                                                              |
+| pocket_rpc           | string           | Pocket node or load balancer URL                                                                                     |
+| log_level            | string           | Log level                                                                                                            |
+| log_format           | string           | Log format (json or colorized text)                                                                                  |
+| schedule             | string           | Frequency of the "What to Stake" service calls                                                                       |
+| run_once_at_start    | boolean          | If true, the WTSC evaluation job runs immediately at startup, then follows the schedule. If false, the first job runs according to the schedule parameter. |
+| max_workers          | integer          | Number of workers to process stake transactions in parallel                                                          |
+| max_retries          | integer          | Number of retries for HTTP calls (POKTscan API or Pocket RPC)                                                        |
+| max_timeout          | integer          | Timeout in milliseconds for HTTP calls                                                                               |
 
-### Available Environment Variables
+#### Environment Variables
 
-1. `RELOAD_SECONDS`: Time in seconds to reload the config file.
-2. `CONFIG_FILE`: Override the default `./config.json` path to lookup configs.
+To customize the behavior of the Makefile commands, you can set the following environment variables:
+
+- **PROJECT_ROOT**: Override the current working directory.
+- **CONFIG_FILE**: Override the default config file name `config.json`.
+- **VERSION**: Specify the project version.
+
+For example, to use a custom config file:
+
+```sh
+CONFIG_FILE=custom_config.json make build
+```
 
 ### FAQ
 
@@ -104,7 +166,7 @@ The `schedule` parameter specifies how often the "What to Stake" service should 
 
 #### How do I override the default configuration file path?
 
-You can override the default configuration file path by setting the `CONFIG_FILE` environment variable to the desired file path. This allows you to use a custom configuration file location if necessary.
+You play on this using `PROJECT_ROOT` and `CONFIG_FILE` to override working directory and config file name.
 
 #### What should I do if the tool is not producing expected results?
 

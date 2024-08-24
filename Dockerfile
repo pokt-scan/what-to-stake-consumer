@@ -1,39 +1,46 @@
-# Specify the base image
+# Build stage
 FROM golang:1.23.0 as builder
-
-# Set the Current Working Directory inside the container
 WORKDIR /app
 
-# Copy go.mod and go.sum files
+# Download Go dependencies
 COPY go.mod go.sum ./
-
-# Download all dependencies. Dependencies will be cached if go.mod and go.sum files are not changed
 RUN go mod download
 
-# Copy the source from the current directory to the Working Directory inside the container
+# Copy the entire repository
 COPY . .
 
-# Build the Go app
-WORKDIR /app/cmd/wtsc
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -a -installsuffix cgo -o /app/wtsc .
+# Set default build environment variables, which can be overridden at build time
+ARG GOOS=linux
+ARG GOARCH=amd64
+ENV CGO_ENABLED=0
+ENV GOOS=${GOOS}
+ENV GOARCH=${GOARCH}
 
-# Start a new minimal image
+# Build the binary and place it in /app/bin
+RUN mkdir -p /app/bin && go build -ldflags '-w -extldflags "-static"' -o /app/bin/wtsc ./cmd/wtsc
+
+# Verification step to ensure binary creation and permissions
+RUN ls -la /app/bin/wtsc && chmod +x /app/bin/wtsc && ls -la /app/bin/wtsc
+
+# Final stage
 FROM alpine:latest
 
-# Create a non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Install tini and bash
+RUN apk add --no-cache tini bash file
 
-# Copy the Pre-built binary file from the previous stage
-COPY --from=builder /app/wtsc /app/wtsc
+# Copy the binary from the builder stage
+COPY --from=builder /app/bin/wtsc /app/bin/wtsc
 
-# Change ownership of the files to the non-root user
-RUN chown -R appuser:appgroup /app
+# Create the results directory
+RUN mkdir -p /app/results
 
-# Declare a path for results to be mounted
+# Ensure execute permissions explicitly
+RUN chmod +x /app/bin/wtsc && ls -la /app/bin/wtsc
+
+# Declare a volume to save results
 VOLUME /app/results
 
-# Use non-root user
-USER appuser
+WORKDIR /app
 
-# Command to run the executable
-CMD ["/app/wtsc"]
+# Adjust entry point to execute the binary
+CMD ["/sbin/tini", "--", "/app/bin/wtsc"]

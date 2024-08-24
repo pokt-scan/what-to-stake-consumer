@@ -1,5 +1,5 @@
-schema: generated/schema.graphql
+schema: wtsc/generated/schema.graphql
 operations:
-  - operations.graphql
-generated: generated/wts.go
+  - wtsc/operations.graphql
+generated: wtsc/generated/wts.go
 package: generated

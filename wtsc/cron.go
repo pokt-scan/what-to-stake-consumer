@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pokt-scan/wtsc/generated"
+	"github.com/pokt-scan/wtsc/wtsc/generated"
 	"github.com/robfig/cron/v3"
 	"os"
 	"path/filepath"
@@ -30,7 +30,7 @@ func writeResults(result *generated.GetWhatToStakeResponse) {
 	fileName := fmt.Sprintf("wts_result_%s.json", dateTimeString)
 
 	// Concatenate paths to form the full file path
-	fullPath := filepath.Join(AppConfig.ResultsPath, fileName)
+	fullPath := filepath.Join(ProjectRoot, AppConfig.ResultsPath, fileName)
 
 	// Write the JSON to a file
 	file, err := os.Create(fullPath)
@@ -114,7 +114,7 @@ func evaluationJob() {
 	group.Wait()
 }
 
-func Schedule(frequency string) (entry cron.EntryID, err error) {
+func Schedule(frequency string, runOnce bool) (entry cron.EntryID, err error) {
 	Logger.Info().Msg("preparing cron job")
 	CronJob = cron.New()
 	// Define the job
@@ -122,6 +122,10 @@ func Schedule(frequency string) (entry cron.EntryID, err error) {
 	Logger.Debug().Int("schedule_id", int(entry)).Msg("scheduled job detail")
 	// Start the cron job
 	CronJob.Start()
+	if runOnce {
+		// run it right now
+		go evaluationJob()
+	}
 	return
 }
 
@@ -133,7 +137,8 @@ func ReSchedule(frequency string) error {
 
 	CronJob.Stop()
 
-	entryId, err := Schedule(frequency)
+	// schedule it but without run it right now no mater what config say, because this is used on config hot-reload
+	entryId, err := Schedule(frequency, false)
 
 	if err != nil {
 		return err

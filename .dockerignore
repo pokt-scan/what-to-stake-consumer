@@ -1,3 +1,11 @@
+.gitignore
+.github
 config.json
 config.json.sample
+config.*.json
+genqlient.yaml
+docker-compose.yaml
+bin
+results
+Makefile
 README.md
